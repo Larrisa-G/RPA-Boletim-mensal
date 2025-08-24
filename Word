@@ -1,0 +1,107 @@
+Public Sub CopiarGraficosParaWord(ws As Worksheet, wdDoc As Object, wdRng As Object, FONTE As String)
+    Dim i As Long
+    Dim chObj As ChartObject
+    Dim wsTemp As Worksheet
+    Dim rngFonte As Object
+    Dim seriesCount As Long
+    Dim catNames As Variant
+    
+    ' --- Cria/limpa planilha temporária ---
+    On Error Resume Next
+    Set wsTemp = ThisWorkbook.Sheets("TempGraficos")
+    If wsTemp Is Nothing Then
+        Set wsTemp = ThisWorkbook.Sheets.Add
+        wsTemp.Name = "TempGraficos"
+    Else
+        ' Limpa células e remove gráficos existentes
+        wsTemp.Cells.Clear
+        Dim ch As ChartObject
+        For Each ch In wsTemp.ChartObjects
+            ch.Delete
+        Next ch
+    End If
+    On Error GoTo 0
+    
+    ' --- Loop pelos gráficos listados ---
+    For i = LBound(listGraficos) To UBound(listGraficos)
+        Debug.Print "======================================"
+        Debug.Print "Processando gráfico: " & listGraficos(i)
+        
+        On Error Resume Next
+        Set chObj = ws.ChartObjects(listGraficos(i))
+        On Error GoTo 0
+        
+        If chObj Is Nothing Then
+            Debug.Print "Erro: Gráfico não encontrado!"
+            GoTo ProximoGrafico
+        End If
+        
+        ' --- Checa se é PivotChart ---
+        If Not chObj.Chart.PivotLayout Is Nothing Then
+            Debug.Print "É PivotChart. Transformando em gráfico normal..."
+            TransformarPivotChartEmNormal chObj
+            Set chObj = wsTemp.ChartObjects(1)
+        End If
+        
+        ' --- Verifica se o gráfico tem séries ---
+        On Error Resume Next
+        seriesCount = chObj.Chart.SeriesCollection.Count
+        On Error GoTo 0
+        
+        If seriesCount = 0 Then
+            Debug.Print "Erro: Gráfico sem séries. Ignorando."
+            GoTo ProximoGrafico
+        End If
+        
+        ' --- Verifica eixo horizontal ---
+        On Error Resume Next
+        catNames = chObj.Chart.Axes(xlCategory).CategoryNames
+        On Error GoTo 0
+        
+        If IsEmpty(catNames) Then
+            Debug.Print "Aviso: Eixo horizontal vazio."
+        Else
+            Debug.Print "Eixo horizontal com " & UBound(catNames) - LBound(catNames) + 1 & " categorias."
+        End If
+        
+        ' --- Formata meses e anos ---
+        On Error Resume Next
+        InserirMesesEAnosNoEixo chObj
+        FormatarEixoHorizontalParaWord chObj
+        On Error GoTo 0
+        
+        ' --- Verifica Range Word ---
+        If wdRng Is Nothing Then
+            Debug.Print "Erro: Range Word inválido. Gráfico não será colado."
+            GoTo ProximoGrafico
+        End If
+        
+        ' --- Copia gráfico para Word ---
+        chObj.Chart.ChartArea.Copy
+        wdRng.PasteSpecial Link:=False
+        Debug.Print "Gráfico colado no Word com sucesso."
+        
+        ' --- Fonte abaixo do gráfico ---
+        wdRng.ParagraphFormat.Alignment = 1 ' centralizado
+        wdRng.ParagraphFormat.Style = wdDoc.Styles("Normal")
+        wdRng.Collapse 0
+        wdRng.InsertParagraphAfter
+        wdRng.Collapse 0
+        Set rngFonte = wdDoc.Range(Start:=wdRng.End, End:=wdRng.End)
+        rngFonte.Text = FONTE
+        On Error Resume Next
+        rngFonte.Style = wdDoc.Styles("Fonte")
+        On Error GoTo 0
+        rngFonte.InsertParagraphAfter
+        rngFonte.Collapse 0
+        rngFonte.InsertAfter vbCrLf & vbCrLf & vbCrLf
+        Set wdRng = wdDoc.Range(Start:=rngFonte.End, End:=rngFonte.End)
+        
+ProximoGrafico:
+    Next i
+    
+    ' --- Limpa planilha temporária ---
+    wsTemp.Cells.Clear
+    Debug.Print "======================================"
+    Debug.Print "Processamento concluído."
+End Sub
