@@ -1,0 +1,28 @@
+Option Explicit
+
+' Constantes simples
+Public Const CAMINHO_DOC As String = "C:\Users\laris_9ikgs\OneDrive - ANP\SGP - Equipe CBEN - DRIVE G\PESQUISAS SQVT\PMBEN - Respostas Anônimas a partir de Out de 2023\5. Boletim Pulso ANP\Word\2025\8 ago\PULSO_ANP_N3_Agosto_2025_Parte2.docx"
+Public Const NOME_SHEET_GRAFICOS As String = "Gráficos segmentados"
+Public Const NOME_SLICER As String = "SegmentaçãodeDados_UORG___corrigido1"
+Public Const FONTE As String = "Fonte: Elaboração própria CBEN/SGP"
+
+' Variáveis globais
+Public listUorg As Variant
+Public listGraficos As Variant
+
+' Inicializa arrays globais
+Public Sub InitConfig()
+    ' Array de unidades organizacionais
+    listUorg = Array("AUD", "CPT", "CRG", "DG", "DIR-1", "DIR-4", "EDF", "GAB", "NGC")
+                       
+    ' Array de gráficos
+    listGraficos = Array( _
+        "FBG e FBT", _
+        "SGP", _
+        "Classificação SGP", _
+        "CBEN", _
+        "Classificação CBEN", _
+        "chefia imediata", _
+        "Classificação CI" _
+    )
+End Sub
