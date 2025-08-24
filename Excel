@@ -1,0 +1,387 @@
+Option Explicit
+Private Function RightmostUorgEnd(ByVal titulo As String) As Long
+    Dim u As Variant, pat As String
+    Dim p As Long, bestEnd As Long
+    
+    ' Normaliza traço: também trata caso o título use EN DASH "–"
+    Dim tituloNorm As String
+    tituloNorm = Replace(titulo, " – ", " - ")
+    
+    bestEnd = 0
+    For Each u In listUorg
+        pat = " - " & CStr(u)
+        ' Procura da direita para a esquerda (case-insensitive)
+        p = InStrRev(tituloNorm, pat, -1, vbTextCompare)
+        If p > 0 Then
+            If p + Len(pat) > bestEnd Then
+                bestEnd = p + Len(pat)
+            End If
+        End If
+    Next u
+    
+    RightmostUorgEnd = bestEnd
+End Function
+
+Public Sub FiltrarSlicerPorSetor(setor As String)
+    Dim sc As SlicerCache, visList(0 To 0) As String
+    Set sc = ThisWorkbook.SlicerCaches(NOME_SLICER)
+    
+    If sc.OLAP Then
+        visList(0) = "[Dados Tratados].[UORG - corrigido].&[" & setor & "]"
+        sc.ClearManualFilter
+        sc.VisibleSlicerItemsList = visList
+    Else
+        Dim si As SlicerItem
+        sc.ClearManualFilter
+        For Each si In sc.SlicerItems
+            si.Selected = (si.Name = setor)
+        Next si
+    End If
+End Sub
+
+Public Sub AtualizarTituloGraficos(ByVal sufixo As String)
+    Dim ws As Worksheet
+    Dim ch As ChartObject
+    Dim t As String
+    Dim pos As Long
+    
+    Set ws = ThisWorkbook.Sheets(NOME_SHEET_GRAFICOS)
+    
+    For Each ch In ws.ChartObjects
+        If ch.Chart.HasTitle Then
+            t = ch.Chart.ChartTitle.Text
+            pos = InStrRev(t, " | ")
+            
+            If pos > 0 Then
+                ' Substitui o que está depois do " | "
+                t = Left$(t, pos - 1)
+                ch.Chart.ChartTitle.Text = t & " | " & sufixo
+            Else
+                ch.Chart.ChartTitle.Text = t & " | " & sufixo
+            End If
+        End If
+    Next ch
+End Sub
+
+Public Sub InserirAnosNoEixo(ByVal chObj As ChartObject)
+    Dim catNames As Variant
+    Dim i As Long, firstIdx As Long, lastIdx As Long
+    Dim anoAtual As Variant
+    Dim anosDict As Object
+    Dim plotLeft As Double, plotWidth As Double, plotTop As Double, plotHeight As Double
+    Dim passo As Double, xPos As Double
+    Dim primeiroIndice As Long, ultimoIndice As Long
+    
+    On Error Resume Next
+    catNames = chObj.Chart.Axes(xlCategory).CategoryNames
+    On Error GoTo 0
+    
+    If IsEmpty(catNames) Then Exit Sub
+    
+    firstIdx = LBound(catNames)
+    lastIdx = UBound(catNames)
+    
+    ' Criar dicionário com o primeiro e último índice de cada ano
+    Set anosDict = CreateObject("Scripting.Dictionary")
+    
+    For i = firstIdx To lastIdx
+        anoAtual = Right(CStr(catNames(i)), 4) ' Assume que o ano são os 4 últimos caracteres
+        If Not anosDict.Exists(anoAtual) Then
+            ' Armazenar primeiro e último índice
+            anosDict(anoAtual) = Array(i, i)
+        Else
+            ' Atualiza último índice
+            anosDict(anoAtual)(1) = i
+        End If
+    Next i
+    
+    ' Obter dimensões da área do gráfico
+    With chObj.Chart.PlotArea
+        plotLeft = .InsideLeft
+        plotWidth = .InsideWidth
+        plotTop = .InsideTop
+        plotHeight = .InsideHeight
+    End With
+    
+    ' Largura média por categoria
+    passo = plotWidth / lastIdx
+    
+    ' Inserir caixas de texto com os anos centralizadas
+    Dim indices As Variant
+    For Each anoAtual In anosDict.Keys
+        indices = anosDict(anoAtual)
+        primeiroIndice = indices(0)
+        ultimoIndice = indices(1)
+        
+        ' Posição central do ano
+        xPos = plotLeft + ((primeiroIndice - 1) + (ultimoIndice - primeiroIndice + 1) / 2) * passo
+        
+        With chObj.Chart.Shapes.AddTextbox(msoTextOrientationHorizontal, xPos - 20, plotTop + plotHeight + 15, 40, 15)
+            .TextFrame.Characters.Text = anoAtual
+            .TextFrame.HorizontalAlignment = xlHAlignCenter
+            .TextFrame.VerticalAlignment = xlVAlignTop
+            .Line.Visible = msoFalse ' Sem borda
+            .TextFrame.Characters.Font.Color = RGB(89, 89, 89) ' Cor #595959
+        End With
+    Next anoAtual
+End Sub
+
+Public Sub FormatarEixoHorizontalParaWord(ByVal ch As ChartObject)
+    Dim ax As Axis
+    
+    If ch.Chart.HasAxis(xlCategory) Then
+        On Error Resume Next
+        ch.Chart.Axes(xlCategory).TickLabels.Levels(1).Font.Color = RGB(255, 255, 255) ' Ano branco
+        ch.Chart.Axes(xlCategory).TickLabels.Levels(2).Font.Color = RGB(89, 89, 89)   ' Mês cinza
+        On Error GoTo 0
+    End If
+End Sub
+Public Sub InserirMesesEAnosNoEixo(ByVal chObj As ChartObject)
+    Dim catNames As Variant
+    Dim i As Long, n As Long
+    Dim partes() As String
+    Dim mesAtual As String, anoAtual As Variant
+    Dim anosDict As Object
+    Dim plotLeft As Double, plotWidth As Double, plotTop As Double, plotHeight As Double
+    Dim passo As Double, xPos As Double
+    Dim primeiroIndice As Long, ultimoIndice As Long
+    
+    ' --- Captura categorias do eixo horizontal ---
+    On Error Resume Next
+    catNames = chObj.Chart.Axes(xlCategory).CategoryNames
+    On Error GoTo 0
+    
+    If IsEmpty(catNames) Then Exit Sub
+    
+    n = UBound(catNames) - LBound(catNames) + 1
+    If n <= 0 Then Exit Sub
+    
+    ' --- Dicionário para armazenar primeiro e último índice de cada ano ---
+    Set anosDict = CreateObject("Scripting.Dictionary")
+    
+    ' --- Extrai meses e reorganiza rótulos ---
+    For i = LBound(catNames) To UBound(catNames)
+        partes = Split(catNames(i), " ")
+        If UBound(partes) >= 1 Then
+            mesAtual = partes(0)
+            anoAtual = partes(1)
+            
+            ' Substitui rótulo pelo mês apenas
+            catNames(i) = mesAtual
+            
+            ' Armazena intervalo de cada ano
+            If Not anosDict.Exists(anoAtual) Then
+                anosDict(anoAtual) = Array(i, i)
+            Else
+                anosDict(anoAtual)(1) = i
+            End If
+        End If
+    Next i
+    
+    ' --- Atualiza eixo horizontal com apenas os meses ---
+    chObj.Chart.Axes(xlCategory).CategoryNames = catNames
+    
+    ' --- Obtém dimensões da área do gráfico ---
+    With chObj.Chart.PlotArea
+        plotLeft = .InsideLeft
+        plotWidth = .InsideWidth
+        plotTop = .InsideTop
+        plotHeight = .InsideHeight
+    End With
+    
+    ' --- Calcula largura média por categoria ---
+    If n > 0 Then
+        passo = plotWidth / n
+    Else
+        passo = 0
+    End If
+    
+    ' --- Insere caixas de texto com anos centralizados ---
+    If passo > 0 Then
+        Dim indices As Variant
+        For Each anoAtual In anosDict.Keys
+            indices = anosDict(anoAtual)
+            primeiroIndice = indices(0)
+            ultimoIndice = indices(1)
+            
+            ' Posição central do grupo de meses do ano
+            xPos = plotLeft + ((primeiroIndice - LBound(catNames)) + (ultimoIndice - primeiroIndice + 1) / 2) * passo
+            
+            ' Adiciona caixa de texto para o ano
+            With chObj.Chart.Shapes.AddTextbox(msoTextOrientationHorizontal, xPos - 20, plotTop + plotHeight + 15, 40, 15)
+                .TextFrame.Characters.Text = anoAtual
+                .TextFrame.HorizontalAlignment = xlHAlignCenter
+                .TextFrame.VerticalAlignment = xlVAlignTop
+                .Line.Visible = msoFalse
+                .TextFrame.Characters.Font.Color = RGB(89, 89, 89) ' cinza escuro
+            End With
+        Next anoAtual
+    End If
+    
+    ' --- Ajusta cores do eixo ---
+    On Error Resume Next
+    chObj.Chart.Axes(xlCategory).TickLabels.Levels(1).Font.Color = RGB(255, 255, 255) ' anos invisíveis
+    chObj.Chart.Axes(xlCategory).TickLabels.Levels(2).Font.Color = RGB(89, 89, 89)    ' meses visíveis
+    On Error GoTo 0
+End Sub
+Public Sub TransformarPivotChartEmNormal(chPivot As ChartObject)
+    Dim wsTemp As Worksheet
+    Dim chNormal As ChartObject
+    Dim catNames As Variant
+    Dim i As Long, anoAtual As Variant, mesAtual As String
+    Dim anosDict As Object
+    Dim plotLeft As Double, plotTop As Double, plotWidth As Double, plotHeight As Double
+    Dim passo As Double, xPos As Double
+    Dim primeiroIndice As Long, ultimoIndice As Long
+    Dim partes() As String
+    
+    Debug.Print "======================================"
+    Debug.Print "Iniciando TransformarPivotChartEmNormal para: " & chPivot.Name
+    
+    ' --- Cria planilha temporária ---
+    On Error Resume Next
+    Set wsTemp = ThisWorkbook.Sheets("TempGraficos")
+    If wsTemp Is Nothing Then
+        Set wsTemp = ThisWorkbook.Sheets.Add
+        wsTemp.Name = "TempGraficos"
+        Debug.Print "Criada planilha TempGraficos."
+    Else
+        wsTemp.Cells.Clear
+        Dim ch As ChartObject
+        For Each ch In wsTemp.ChartObjects
+            ch.Delete
+        Next ch
+        Debug.Print "Planilha TempGraficos limpa."
+    End If
+    On Error GoTo 0
+    
+    ' --- Verifica se é PivotChart e se tem dados ---
+    If Not chPivot.Chart.PivotLayout Is Nothing Then
+        If chPivot.Chart.PivotLayout.PivotTable.DataBodyRange Is Nothing Then
+            Debug.Print "PivotTable vazio para gráfico: " & chPivot.Name & " | Ignorando."
+            Exit Sub
+        End If
+        
+        Debug.Print "PivotChart detectado. Tentando RefreshTable..."
+        On Error Resume Next
+        chPivot.Chart.PivotLayout.PivotTable.RefreshTable
+        If Err.Number <> 0 Then
+            Debug.Print "ERRO: RefreshTable falhou - " & Err.Description
+            Err.Clear
+            Exit Sub
+        Else
+            Debug.Print "RefreshTable executado com sucesso."
+        End If
+        On Error GoTo 0
+        
+        DoEvents
+        Application.Wait Now + TimeValue("0:00:01") ' espera 1 segundo
+    Else
+        Debug.Print "Não é PivotChart."
+    End If
+    
+    ' --- Copia PivotChart como gráfico normal ---
+    On Error Resume Next
+    chPivot.Chart.ChartArea.Copy
+    If Err.Number <> 0 Then
+        Debug.Print "ERRO: falha ao copiar ChartArea - " & Err.Description
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    Set chNormal = wsTemp.ChartObjects.Add(Left:=10, Top:=10, Width:=chPivot.Width, Height:=chPivot.Height)
+    On Error Resume Next
+    chNormal.Chart.Paste
+    If Err.Number <> 0 Then
+        Debug.Print "ERRO: falha ao colar gráfico na planilha temporária - " & Err.Description
+        Exit Sub
+    Else
+        Debug.Print "Gráfico colado na planilha temporária com sucesso."
+    End If
+    On Error GoTo 0
+    
+    ' --- Extrai categorias ---
+    On Error Resume Next
+    catNames = chNormal.Chart.Axes(xlCategory).CategoryNames
+    If Err.Number <> 0 Then
+        Debug.Print "ERRO: falha ao acessar CategoryNames - " & Err.Description
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    If IsEmpty(catNames) Or UBound(catNames) < LBound(catNames) Then
+        Debug.Print "Aviso: CategoryNames vazio. Gráfico possivelmente sem dados para o setor filtrado."
+        Exit Sub
+    Else
+        Debug.Print "CategoryNames detectado: " & UBound(catNames) - LBound(catNames) + 1 & " categorias."
+    End If
+    
+    Set anosDict = CreateObject("Scripting.Dictionary")
+    
+    ' --- Organiza meses e anos ---
+    For i = LBound(catNames) To UBound(catNames)
+        partes = Split(catNames(i), " ")
+        If UBound(partes) >= 1 Then
+            mesAtual = partes(0)
+            anoAtual = partes(1)
+            catNames(i) = mesAtual ' Apenas mês
+            
+            If Not anosDict.Exists(anoAtual) Then
+                anosDict(anoAtual) = Array(i, i)
+            Else
+                anosDict(anoAtual)(1) = i
+            End If
+        Else
+            Debug.Print "Aviso: rótulo da categoria não no formato esperado: " & catNames(i)
+        End If
+    Next i
+    
+    ' Atualiza eixo horizontal com meses
+    chNormal.Chart.Axes(xlCategory).CategoryNames = catNames
+    Debug.Print "Eixo horizontal atualizado com meses."
+    
+    ' --- Dimensões do gráfico ---
+    With chNormal.Chart.PlotArea
+        plotLeft = .InsideLeft
+        plotTop = .InsideTop
+        plotWidth = .InsideWidth
+        plotHeight = .InsideHeight
+    End With
+    Debug.Print "Dimensões do gráfico - Left: " & plotLeft & ", Top: " & plotTop & ", Width: " & plotWidth & ", Height: " & plotHeight
+    
+    ' --- Calcula passo evitando divisão por zero ---
+    If UBound(catNames) - LBound(catNames) + 1 > 0 Then
+        passo = plotWidth / (UBound(catNames) - LBound(catNames) + 1)
+    Else
+        Debug.Print "Erro: eixo horizontal vazio. Não é possível calcular passo."
+        Exit Sub
+    End If
+    
+    ' --- Inserir anos ---
+    Dim indices As Variant
+    For Each anoAtual In anosDict.Keys
+        indices = anosDict(anoAtual)
+        primeiroIndice = indices(0)
+        ultimoIndice = indices(1)
+        
+        xPos = plotLeft + ((primeiroIndice - LBound(catNames)) + (ultimoIndice - primeiroIndice + 1) / 2) * passo
+        
+        With chNormal.Chart.Shapes.AddTextbox(msoTextOrientationHorizontal, xPos - 20, plotTop + plotHeight + 5, 40, 15)
+            .TextFrame.Characters.Text = anoAtual
+            .TextFrame.HorizontalAlignment = xlHAlignCenter
+            .TextFrame.VerticalAlignment = xlVAlignTop
+            .Line.Visible = msoFalse
+            .TextFrame.Characters.Font.Color = RGB(89, 89, 89)
+        End With
+        Debug.Print "Ano inserido: " & anoAtual & " (indices: " & primeiroIndice & "-" & ultimoIndice & ")"
+    Next anoAtual
+    
+    ' --- Ajusta cores do eixo horizontal ---
+    On Error Resume Next
+    chNormal.Chart.Axes(xlCategory).TickLabels.Levels(1).Font.Color = RGB(255, 255, 255) ' Ano invisível
+    chNormal.Chart.Axes(xlCategory).TickLabels.Levels(2).Font.Color = RGB(89, 89, 89)   ' Mês visível
+    On Error GoTo 0
+    
+    Debug.Print "TransformarPivotChartEmNormal concluído para: " & chPivot.Name
+    Debug.Print "======================================"
+End Sub
