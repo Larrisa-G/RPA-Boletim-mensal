@@ -1,0 +1,44 @@
+Option Explicit
+
+Public Function ExtractCode(ByVal uniqueName As String) As String
+    Dim p As Long, q As Long
+    p = InStrRev(uniqueName, "&[")
+    If p > 0 Then
+        q = InStr(p + 2, uniqueName, "]")
+        If q > 0 Then ExtractCode = Mid$(uniqueName, p + 2, q - (p + 2))
+    End If
+End Function
+
+Public Function AbrirWord() As Object
+    Dim wdApp As Object
+    On Error Resume Next
+    Set wdApp = GetObject(, "Word.Application")
+    On Error GoTo 0
+    If wdApp Is Nothing Then Set wdApp = CreateObject("Word.Application")
+    wdApp.Visible = True
+    Set AbrirWord = wdApp
+End Function
+
+Public Function LocalizarTituloNoWord(wdDoc As Object, setor As String) As Object
+    Dim wdRng As Object
+    Set wdRng = wdDoc.Content
+
+    With wdRng.Find
+        .ClearFormatting
+        .Style = wdDoc.Styles("Título 3")
+        .Text = setor
+        .Forward = True
+        .MatchCase = False
+        .Execute
+    End With
+    
+    If wdRng.Find.Found Then
+        wdRng.Collapse 0
+        wdRng.InsertParagraphAfter
+        wdRng.Collapse 0
+        Set LocalizarTituloNoWord = wdDoc.Range(Start:=wdRng.End, End:=wdRng.End)
+    Else
+        MsgBox "Título do setor não encontrado: " & setor, vbExclamation
+        Set LocalizarTituloNoWord = Nothing
+    End If
+End Function
