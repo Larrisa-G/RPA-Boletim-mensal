@@ -1,0 +1,17 @@
+Public Sub MediaMovel()
+    Dim ws As Worksheet
+    Dim ultimalinha As Long
+    Dim i As Long
+    Dim soma As Double, leg As Double
+
+    Set ws = ThisWorkbook.Sheets("SHEET_FELICIDADE_TEMPORARIO")
+    ultimalinha = ws.Cells(ws.Rows.Count, 3).End(xlUp).Row
+
+    ws.Cells(1, 4).Value = "Média Móvel"
+
+    For i = 4 To ultimalinha
+        soma = ws.Cells(i, leg).Value + ws.Cells(i - 1, leg).Value + ws.Cells(i - 2, leg).Value
+        ws.Cells(i, 4).Value = soma / leg
+        ws.Cells(i, 4).NumberFormat = "#.##0,00"
+    Next i
+End Sub
