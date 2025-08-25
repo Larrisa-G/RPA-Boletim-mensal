@@ -1,24 +1,24 @@
-Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalinha As Long)
+Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalinha As Long, coluna As Long, posTop As Double)
     Dim ch As ChartObject
     Dim inicioBloco As Long
     
     Set ch = wsTemp.ChartObjects.Add(Left:=10, Top:=10, Width:=396, Height:=178)
     Set wsTemp = ThisWorkbook.Sheets("TabTemporária")
-    
+        
     With ch.Chart
-        .ChartType = xlLine
-        .SetSourceData Source:=wsTemp.Range("C2:C" & ultimalinha)
-        .Axes(xlCategory).CategoryNames = wsTemp.Range("A2:B" & ultimalinha)
-        .Axes(xlValue).TickLabels.NumberFormatLocal = "0,00"
-
+    .ChartType = xlLine
+    .SetSourceData Source:=wsTemp.Range(wsTemp.Cells(1, coluna), wsTemp.Cells(ultimalinha, coluna))
+    .Axes(xlCategory).CategoryNames = wsTemp.Range("A2:B" & ultimalinha) ' X: duas colunas (Ano + Mês)
+        
         ' Título
         .HasTitle = True
         With .ChartTitle
-            .Text = wsTemp.Cells(1, 3) & " | " & setor
+            .Text = wsTemp.Cells(1, coluna).Value & " | " & setor
             .Font.Size = 14
             .Font.Bold = False
             .Font.Color = RGB(89, 89, 89)
         End With
+
 
         ' Eixo Y
         With .Axes(xlValue)
@@ -109,18 +109,25 @@ Private Sub MesclarColunaAno(ws As Worksheet, ByVal colAno As Long, ByVal primei
     Loop
 End Sub
 
-
-Public Sub junção(setor As String)
+Public Sub GerarGraficoPorColuna(setor As String)
     Dim wsTemp As Worksheet
-    Dim ultimalinha As Long
+    Dim ultimalinha As Long, ultimaCol As Long
+    Dim coluna As Long
+    Dim posTop As Double
     
-    Set wsTemp = ThisWorkbook.Sheets("TabTemporária")
+    Set wsTemp = ThisWorkbook.Sheets(SHEET_TEMPORARIO)
     
     Call PreencheIntervaloApartirTabDinamica(setor, wsTemp)
     
     Set rngTemp = wsTemp.Range("A1").CurrentRegion
     ultimalinha = wsTemp.Cells(wsTemp.Rows.Count, "A").End(xlUp).Row
+    ultimaCol = wsTemp.Cells(1, wsTemp.Columns.Count).End(xlToLeft).Column
     
     Call MesclarColunaAno(wsTemp, 1, 2, ultimalinha)  'coluna A, dados a partir da linha 2
-    Call GerarGraficoDeLinhas(setor, wsTemp, ultimalinha)
+    
+    posTop = 10
+    For coluna = 3 To ultimaCol
+        Call GerarGraficoDeLinhas(setor, wsTemp, ultimalinha, coluna, posTop)
+        posTop = posTop + 190  ' espaçamento vertical entre gráficos
+    Next coluna
 End Sub
