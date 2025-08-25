@@ -1,0 +1,126 @@
+Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalinha As Long)
+    Dim ch As ChartObject
+    Dim inicioBloco As Long
+    
+    Set ch = wsTemp.ChartObjects.Add(Left:=10, Top:=10, Width:=396, Height:=178)
+    Set wsTemp = ThisWorkbook.Sheets("TabTemporária")
+    
+    With ch.Chart
+        .ChartType = xlLine
+        .SetSourceData Source:=wsTemp.Range("C2:C" & ultimalinha)
+        .Axes(xlCategory).CategoryNames = wsTemp.Range("A2:B" & ultimalinha)
+        .Axes(xlValue).TickLabels.NumberFormatLocal = "0,00"
+
+        ' Título
+        .HasTitle = True
+        With .ChartTitle
+            .Text = wsTemp.Cells(1, 3) & " | " & setor
+            .Font.Size = 14
+            .Font.Bold = False
+            .Font.Color = RGB(89, 89, 89)
+        End With
+
+        ' Eixo Y
+        With .Axes(xlValue)
+            .MinimumScale = 4
+            .MaximumScale = 8
+            .MajorUnit = 1
+            .TickLabels.NumberFormat = "#.##0,00"
+            .TickLabels.Font.Size = 9
+            .TickLabels.Font.Color = RGB(89, 89, 89)
+            .Format.Line.Visible = msoFalse
+            .HasMajorGridlines = True
+        End With
+
+        ' Eixo X
+        With .Axes(xlCategory).TickLabels.Font
+            .Size = 9
+            .Color = RGB(89, 89, 89)
+        End With
+
+        ' Limpa elementos extras
+        .HasLegend = False
+        .Axes(xlCategory).HasTitle = False
+        .Axes(xlValue).HasTitle = False
+    End With
+End Sub
+
+Private Sub PreencheIntervaloApartirTabDinamica(setor As String, wsTemp As Worksheet)
+    Dim wsPivot As Worksheet
+    Dim pt As PivotTable
+    Dim rngTemp As Range
+    Dim i As Long
+    
+
+    ' Get/pega tabela dinâmica
+    Set wsPivot = ThisWorkbook.Sheets("DadosPivot")
+    On Error Resume Next
+    Set pt = wsPivot.PivotTables(1)
+    If pt Is Nothing Then
+        MsgBox "Tabela Dinâmica não encontrada!"
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    ' Filtra a Tabela Dinâmica
+    Call FiltrarSlicerPorSetor(setor)
+    On Error Resume Next
+    If wsTemp Is Nothing Then
+        Set wsTemp = ThisWorkbook.Sheets.Add
+        wsTemp.Name = SHEET_TEMPORARIO
+    Else
+        wsTemp.Cells.Clear
+    End If
+    On Error GoTo 0
+
+    ' Copia dados filtrados
+    pt.TableRange2.Copy
+    wsTemp.Range("A1").PasteSpecial Paste:=xlPasteValues
+    Application.CutCopyMode = False
+ 
+End Sub
+
+Private Sub MesclarColunaAno(ws As Worksheet, ByVal colAno As Long, ByVal primeiraLinha As Long, ByVal ultimalinha As Long)
+    Dim i As Long, j As Long
+    Dim v As String, prox As String
+
+    'garante que não há mesclas antigas
+    ws.Range(ws.Cells(primeiraLinha, colAno), ws.Cells(ultimalinha, colAno)).UnMerge
+
+    i = primeiraLinha
+    Do While i <= ultimalinha
+        j = i
+        Do While j < ultimalinha
+            v = Trim$(CStr(ws.Cells(j, colAno).Value))
+            prox = Trim$(CStr(ws.Cells(j + 1, colAno).Value))
+            If v <> prox Then Exit Do
+            j = j + 1
+        Loop
+
+        If j > i Then
+            With ws.Range(ws.Cells(i, colAno), ws.Cells(j, colAno))
+                .Merge
+                .HorizontalAlignment = xlCenter
+                .VerticalAlignment = xlCenter
+            End With
+        End If
+
+        i = j + 1
+    Loop
+End Sub
+
+
+Public Sub junção(setor As String)
+    Dim wsTemp As Worksheet
+    Dim ultimalinha As Long
+    
+    Set wsTemp = ThisWorkbook.Sheets("TabTemporária")
+    
+    Call PreencheIntervaloApartirTabDinamica(setor, wsTemp)
+    
+    Set rngTemp = wsTemp.Range("A1").CurrentRegion
+    ultimalinha = wsTemp.Cells(wsTemp.Rows.Count, "A").End(xlUp).Row
+    
+    Call MesclarColunaAno(wsTemp, 1, 2, ultimalinha)  'coluna A, dados a partir da linha 2
+    Call GerarGraficoDeLinhas(setor, wsTemp, ultimalinha)
+End Sub
