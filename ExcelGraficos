@@ -1,30 +1,68 @@
-Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalinha As Long, coluna As Long, posTop As Double)
+Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalinha As Long, _
+    colunas As Variant, posTop As Double, titulo As String)
+
     Dim ch As ChartObject
-    Dim inicioBloco As Long
-    
-    Set ch = wsTemp.ChartObjects.Add(Left:=10, Top:=10, Width:=396, Height:=178)
-    Set wsTemp = ThisWorkbook.Sheets("TabTemporária")
-        
+    Dim i As Variant
+    Dim rngX As Range
+    Dim rngY As Range
+    Dim minY As Double, maxY As Double
+
+    ' Cria o gráfico
+    Set ch = wsTemp.ChartObjects.Add(Left:=10, Top:=posTop, Width:=396, Height:=178)
+
     With ch.Chart
-    .ChartType = xlLine
-    .SetSourceData Source:=wsTemp.Range(wsTemp.Cells(1, coluna), wsTemp.Cells(ultimalinha, coluna))
-    .Axes(xlCategory).CategoryNames = wsTemp.Range("A2:B" & ultimalinha) ' X: duas colunas (Ano + Mês)
-        
+        .ChartType = xlLine
+
+        ' Define o eixo X (Ano + Mês)
+        Set rngX = wsTemp.Range("A2:B" & ultimalinha)
+
+        ' Reset min/max
+        minY = 1E+99
+        maxY = -1E+99
+
+        ' Adiciona cada série
+        For i = LBound(colunas) To UBound(colunas)
+            Set rngY = wsTemp.Range(wsTemp.Cells(2, colunas(i)), wsTemp.Cells(ultimalinha, colunas(i)))
+            
+            .SeriesCollection.NewSeries
+            .SeriesCollection(.SeriesCollection.Count).Name = wsTemp.Cells(1, colunas(i)).Value
+            .SeriesCollection(.SeriesCollection.Count).XValues = rngX
+            .SeriesCollection(.SeriesCollection.Count).Values = rngY
+
+            ' Atualiza min/max do eixo Y
+            If Application.Min(rngY) < minY Then minY = Application.Min(rngY)
+            If Application.Max(rngY) > maxY Then maxY = Application.Max(rngY)
+        Next i
+
         ' Título
         .HasTitle = True
         With .ChartTitle
-            .Text = wsTemp.Cells(1, coluna).Value & " | " & setor
+            .Text = titulo & " | " & setor
             .Font.Size = 14
             .Font.Bold = False
             .Font.Color = RGB(89, 89, 89)
         End With
 
-
-        ' Eixo Y
+        ' Eixo Y (dinâmico com MajorUnit controlado)
         With .Axes(xlValue)
-            .MinimumScale = 4
-            .MaximumScale = 8
-            .MajorUnit = 1
+            .MinimumScale = WorksheetFunction.RoundDown(minY, 0)
+            .MaximumScale = WorksheetFunction.RoundUp(maxY, 0)
+            
+            ' Decide a unidade principal
+            Dim faixa As Double
+            faixa = .MaximumScale - .MinimumScale
+            
+            Select Case True
+                Case faixa < 0.7
+                    .MajorUnit = 0.25
+                Case faixa < 3
+                    .MajorUnit = 0.5
+                Case faixa < 6
+                    .MajorUnit = 1
+                Case Else
+                    .MajorUnit = 2
+            End Select
+            
             .TickLabels.NumberFormat = "#.##0,00"
             .TickLabels.Font.Size = 9
             .TickLabels.Font.Color = RGB(89, 89, 89)
@@ -32,28 +70,32 @@ Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalin
             .HasMajorGridlines = True
         End With
 
+
         ' Eixo X
         With .Axes(xlCategory).TickLabels.Font
             .Size = 9
             .Color = RGB(89, 89, 89)
         End With
 
-        ' Limpa elementos extras
-        .HasLegend = False
+        ' Legenda ? só mostra se houver mais de 1 série
+        .HasLegend = (UBound(colunas) > LBound(colunas))
+        If .HasLegend Then .Legend.Position = xlLegendPositionBottom
+
         .Axes(xlCategory).HasTitle = False
         .Axes(xlValue).HasTitle = False
     End With
+    Debug.Print ("Gerando gráfico " & titulo)
+    
 End Sub
 
-Private Sub PreencheIntervaloApartirTabDinamica(setor As String, wsTemp As Worksheet)
+Private Sub PreencheIntervaloApartirTabDinamica(setor As String, wsTemp As Worksheet, sheet As String)
     Dim wsPivot As Worksheet
     Dim pt As PivotTable
     Dim rngTemp As Range
     Dim i As Long
     
-
     ' Get/pega tabela dinâmica
-    Set wsPivot = ThisWorkbook.Sheets("DadosPivot")
+    Set wsPivot = ThisWorkbook.Sheets(sheet)
     On Error Resume Next
     Set pt = wsPivot.PivotTables(1)
     If pt Is Nothing Then
@@ -77,6 +119,7 @@ Private Sub PreencheIntervaloApartirTabDinamica(setor As String, wsTemp As Works
     pt.TableRange2.Copy
     wsTemp.Range("A1").PasteSpecial Paste:=xlPasteValues
     Application.CutCopyMode = False
+    wsTemp.Range("A2", "E100").NumberFormat = "0.00"
  
 End Sub
 
@@ -109,25 +152,45 @@ Private Sub MesclarColunaAno(ws As Worksheet, ByVal colAno As Long, ByVal primei
     Loop
 End Sub
 
-Public Sub GerarGraficoPorColuna(setor As String)
-    Dim wsTemp As Worksheet
+Public Sub GerarGraficos(setor As String)
+    Dim wsAvaTemp As Worksheet, wsFelTemp As Worksheet
+    Dim rngTemp As Range
     Dim ultimalinha As Long, ultimaCol As Long
     Dim coluna As Long
     Dim posTop As Double
     
-    Set wsTemp = ThisWorkbook.Sheets(SHEET_TEMPORARIO)
+    Set wsAvaTemp = ThisWorkbook.Sheets("AvaTemp")
+    Set wsFelTemp = ThisWorkbook.Sheets("FelTemp")
     
-    Call PreencheIntervaloApartirTabDinamica(setor, wsTemp)
+    'Felicidades
+    Call PreencheIntervaloApartirTabDinamica(setor, wsFelTemp, "felicidadesDin")
     
-    Set rngTemp = wsTemp.Range("A1").CurrentRegion
-    ultimalinha = wsTemp.Cells(wsTemp.Rows.Count, "A").End(xlUp).Row
-    ultimaCol = wsTemp.Cells(1, wsTemp.Columns.Count).End(xlToLeft).Column
+    Call MediaMovel(3, 5, 3)
+    Call MediaMovel(4, 6, 3)
     
-    Call MesclarColunaAno(wsTemp, 1, 2, ultimalinha)  'coluna A, dados a partir da linha 2
+    Set rngTemp = wsFelTemp.Range("A1").CurrentRegion
+    ultimalinha = wsFelTemp.Cells(wsFelTemp.Rows.Count, "A").End(xlUp).Row
+    ultimaCol = wsFelTemp.Cells(1, wsFelTemp.Columns.Count).End(xlToLeft).Column
     
-    posTop = 10
-    For coluna = 3 To ultimaCol
-        Call GerarGraficoDeLinhas(setor, wsTemp, ultimalinha, coluna, posTop)
-        posTop = posTop + 190  ' espaçamento vertical entre gráficos
-    Next coluna
+    Application.DisplayAlerts = False
+    Call MesclarColunaAno(wsFelTemp, 1, 2, ultimalinha)  'coluna A, dados a partir da linha 2
+    Application.DisplayAlerts = True
+    
+    Call GerarGraficoDeLinhas(setor, wsFelTemp, ultimalinha, Array(5, 6), 200, "Média móvel de FBG e FBT")
+    
+    'Avaliações
+    Call PreencheIntervaloApartirTabDinamica(setor, wsAvaTemp, "AvaliaçõesDin")
+    
+    Set rngTemp = wsAvaTemp.Range("A1").CurrentRegion
+    ultimalinha = wsAvaTemp.Cells(wsAvaTemp.Rows.Count, "A").End(xlUp).Row
+    ultimaCol = wsAvaTemp.Cells(1, wsAvaTemp.Columns.Count).End(xlToLeft).Column
+    
+    Application.DisplayAlerts = False
+    Call MesclarColunaAno(wsAvaTemp, 1, 2, ultimalinha)  'coluna A, dados a partir da linha 2
+    Application.DisplayAlerts = True
+
+    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, Array(3), 200, "Evolução das avaliações da SGP")
+    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, Array(4), 400, "Evolução das avaliações da CBEN")
+    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, Array(5), 500, "Evolução das avaliações da chefia imediata")
+
 End Sub
