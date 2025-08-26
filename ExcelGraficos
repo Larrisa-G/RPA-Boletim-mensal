@@ -1,5 +1,6 @@
 Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalinha As Long, _
-    colunas As Variant, posTop As Double, titulo As String)
+    linCabecalho As Long, colunas As Variant, posTop As Double, titulo As String, _
+    formatacao As String, porcentagem As Boolean)
 
     Dim ch As ChartObject
     Dim i As Variant
@@ -14,7 +15,7 @@ Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalin
         .ChartType = xlLine
 
         ' Define o eixo X (Ano + Mês)
-        Set rngX = wsTemp.Range("A2:B" & ultimalinha)
+        Set rngX = wsTemp.Range("A" & linCabecalho + 1 & ":B" & ultimalinha)
 
         ' Reset min/max
         minY = 1E+99
@@ -22,10 +23,10 @@ Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalin
 
         ' Adiciona cada série
         For i = LBound(colunas) To UBound(colunas)
-            Set rngY = wsTemp.Range(wsTemp.Cells(2, colunas(i)), wsTemp.Cells(ultimalinha, colunas(i)))
+            Set rngY = wsTemp.Range(wsTemp.Cells(linCabecalho + 1, colunas(i)), wsTemp.Cells(ultimalinha, colunas(i)))
             
             .SeriesCollection.NewSeries
-            .SeriesCollection(.SeriesCollection.Count).Name = wsTemp.Cells(1, colunas(i)).Value
+            .SeriesCollection(.SeriesCollection.Count).Name = wsTemp.Cells(linCabecalho, colunas(i)).Value
             .SeriesCollection(.SeriesCollection.Count).XValues = rngX
             .SeriesCollection(.SeriesCollection.Count).Values = rngY
 
@@ -45,31 +46,33 @@ Private Sub GerarGraficoDeLinhas(setor As String, wsTemp As Worksheet, ultimalin
 
         ' Eixo Y (dinâmico com MajorUnit controlado)
         With .Axes(xlValue)
-            .MinimumScale = WorksheetFunction.RoundDown(minY, 0)
-            .MaximumScale = WorksheetFunction.RoundUp(maxY, 0)
+            If porcentagem = True Then
+                .MinimumScale = 0
+                .MaximumScale = 0.8
+                .MajorUnit = 0.2
+            Else
+                .MinimumScale = WorksheetFunction.RoundDown(minY, 0)
+                .MaximumScale = WorksheetFunction.RoundUp(maxY, 0)
+                
+                faixa = .MaximumScale - .MinimumScale
+                
+                Select Case True
+                    Case faixa < 1
+                        .MajorUnit = 0.5
+                    Case faixa < 6
+                        .MajorUnit = 1
+                    Case Else
+                        .MajorUnit = 2
+                End Select
+            End If
             
-            ' Decide a unidade principal
-            Dim faixa As Double
-            faixa = .MaximumScale - .MinimumScale
-            
-            Select Case True
-                Case faixa < 0.7
-                    .MajorUnit = 0.25
-                Case faixa < 3
-                    .MajorUnit = 0.5
-                Case faixa < 6
-                    .MajorUnit = 1
-                Case Else
-                    .MajorUnit = 2
-            End Select
-            
-            .TickLabels.NumberFormat = "#.##0,00"
+            ' Formatação do eixo Y (sempre aplicada)
+            .TickLabels.NumberFormat = formatacao
             .TickLabels.Font.Size = 9
             .TickLabels.Font.Color = RGB(89, 89, 89)
             .Format.Line.Visible = msoFalse
             .HasMajorGridlines = True
         End With
-
 
         ' Eixo X
         With .Axes(xlCategory).TickLabels.Font
@@ -152,7 +155,7 @@ Private Sub MesclarColunaAno(ws As Worksheet, ByVal colAno As Long, ByVal primei
     Loop
 End Sub
 
-Public Sub GerarGraficos(setor As String)
+Public Sub GerarGraficosTeste(setor As String)
     Dim wsAvaTemp As Worksheet, wsFelTemp As Worksheet
     Dim rngTemp As Range
     Dim ultimalinha As Long, ultimaCol As Long
@@ -162,35 +165,43 @@ Public Sub GerarGraficos(setor As String)
     Set wsAvaTemp = ThisWorkbook.Sheets("AvaTemp")
     Set wsFelTemp = ThisWorkbook.Sheets("FelTemp")
     
-    'Felicidades
-    Call PreencheIntervaloApartirTabDinamica(setor, wsFelTemp, "felicidadesDin")
-    
-    Call MediaMovel(3, 5, 3)
-    Call MediaMovel(4, 6, 3)
-    
-    Set rngTemp = wsFelTemp.Range("A1").CurrentRegion
-    ultimalinha = wsFelTemp.Cells(wsFelTemp.Rows.Count, "A").End(xlUp).Row
-    ultimaCol = wsFelTemp.Cells(1, wsFelTemp.Columns.Count).End(xlToLeft).Column
-    
-    Application.DisplayAlerts = False
-    Call MesclarColunaAno(wsFelTemp, 1, 2, ultimalinha)  'coluna A, dados a partir da linha 2
-    Application.DisplayAlerts = True
-    
-    Call GerarGraficoDeLinhas(setor, wsFelTemp, ultimalinha, Array(5, 6), 200, "Média móvel de FBG e FBT")
-    
-    'Avaliações
-    Call PreencheIntervaloApartirTabDinamica(setor, wsAvaTemp, "AvaliaçõesDin")
+    'SGP
+    Call PreencheIntervaloApartirTabDinamica(setor, wsAvaTemp, "DinSGP")
     
     Set rngTemp = wsAvaTemp.Range("A1").CurrentRegion
     ultimalinha = wsAvaTemp.Cells(wsAvaTemp.Rows.Count, "A").End(xlUp).Row
     ultimaCol = wsAvaTemp.Cells(1, wsAvaTemp.Columns.Count).End(xlToLeft).Column
     
     Application.DisplayAlerts = False
-    Call MesclarColunaAno(wsAvaTemp, 1, 2, ultimalinha)  'coluna A, dados a partir da linha 2
+    Call MesclarColunaAno(wsAvaTemp, 1, 2, ultimalinha)
+    Application.DisplayAlerts = True
+    
+    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, 2, Array(3, 4, 5), 200, "Evolução das categorias das avaliações da SGP", "#.##0,0%", True)
+    
+    'CBEN
+    Call PreencheIntervaloApartirTabDinamica(setor, wsAvaTemp, "DinCBEN")
+    
+    Set rngTemp = wsAvaTemp.Range("A1").CurrentRegion
+    ultimalinha = wsAvaTemp.Cells(wsAvaTemp.Rows.Count, "A").End(xlUp).Row
+    ultimaCol = wsAvaTemp.Cells(1, wsAvaTemp.Columns.Count).End(xlToLeft).Column
+    
+    Application.DisplayAlerts = False
+    Call MesclarColunaAno(wsAvaTemp, 1, 2, ultimalinha)
+    Application.DisplayAlerts = True
+    
+    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, 2, Array(3, 4, 5), 400, "Evolução das categorias das avaliações da CBEN", "0,0%", True)
+    
+    'Chefia imediata
+    Call PreencheIntervaloApartirTabDinamica(setor, wsAvaTemp, "DinCI")
+    
+    Set rngTemp = wsAvaTemp.Range("A1").CurrentRegion
+    ultimalinha = wsAvaTemp.Cells(wsAvaTemp.Rows.Count, "A").End(xlUp).Row
+    ultimaCol = wsAvaTemp.Cells(1, wsAvaTemp.Columns.Count).End(xlToLeft).Column
+    
+    Application.DisplayAlerts = False
+    Call MesclarColunaAno(wsAvaTemp, 1, 2, ultimalinha)
     Application.DisplayAlerts = True
 
-    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, Array(3), 200, "Evolução das avaliações da SGP")
-    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, Array(4), 400, "Evolução das avaliações da CBEN")
-    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, Array(5), 500, "Evolução das avaliações da chefia imediata")
-
+    Call GerarGraficoDeLinhas(setor, wsAvaTemp, ultimalinha, 2, Array(3, 4, 5), 700, "Evolução das categorias das avaliações da chefia imediata", "0,0%", True)
 End Sub
+
