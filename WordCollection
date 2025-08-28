@@ -1,0 +1,180 @@
+Option Explicit
+
+' Collection global de gráficos
+Public listaGraficos As Collection
+
+' --- Controlador principal: gera e exporta todos os gráficos ---
+Public Sub GerarExportarGraficos(setor As String)
+    On Error GoTo TratarErro
+    
+    Dim wdApp As Object
+    Dim wdDoc As Object
+    
+    Debug.Print "Início: GerarExportarGraficos | Setor: " & setor
+    
+    ' Inicializa Collection global
+    Set listaGraficos = New Collection
+    
+    ' Gera todos os gráficos necessários
+    Call GerarGraficos(setor)
+    
+    ' Inicializa Word
+    Set wdApp = AbrirWord()
+    If wdApp Is Nothing Then Err.Raise vbObjectError + 1, , "Não foi possível inicializar o Word"
+    
+    ' --- Abrir documento existente ---
+    If Dir(CAMINHO_DOC) = "" Then
+        Err.Raise vbObjectError + 2, , "Arquivo não encontrado: " & CAMINHO_DOC
+    End If
+    Set wdDoc = wdApp.Documents.Open(CAMINHO_DOC)
+    Debug.Print "Documento aberto: " & CAMINHO_DOC
+    
+    ' Copia todos os gráficos para o Word
+    Call CopiarGraficosParaWord(wdDoc, listaGraficos)
+    
+    ' Salva alterações
+    wdDoc.Save
+    Debug.Print "Documento salvo: " & CAMINHO_DOC
+    
+    ' Limpa Collection
+    Set listaGraficos = Nothing
+    Debug.Print "Fim: GerarExportarGraficos"
+    
+    Exit Sub
+    
+TratarErro:
+    MsgBox "Erro em GerarExportarGraficos: " & Err.Description, vbCritical
+    Debug.Print "Erro em GerarExportarGraficos [" & Err.Number & "]: " & Err.Description
+End Sub
+
+' --- Sub que gera todos os gráficos para o setor ---
+Public Sub GerarGraficos(setor As String)
+    On Error GoTo TratarErro
+    
+    Dim wsAvaTemp As Worksheet, wsFelTemp As Worksheet
+    
+    ' Planilhas temporárias
+    Set wsAvaTemp = ThisWorkbook.Sheets("AvaTemp")
+    Set wsFelTemp = ThisWorkbook.Sheets("FelTemp")
+    
+    Debug.Print "Início: GerarGraficos | Setor: " & setor
+    
+    ' --- Felicidades ---
+    Call CriarGraficoDinamico(setor, wsFelTemp, "FelicidadesDin", Array(5, 6), 150, _
+                              "Média móvel de FBG e FBT", "0,00", "mediaMovel", 1)
+    
+    ' --- Avaliações ---
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "AvaliaçõesDin", Array(3), 150, _
+                              "Evolução das avaliações da SGP", "0,00", "media", 2)
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "AvaliaçõesDin", Array(4), 250, _
+                              "Evolução das avaliações da CBEN", "0,00", "media", 5)
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "AvaliaçõesDin", Array(5), 200, _
+                              "Evolução das avaliações da chefia imediata", "0,00", "media", 8)
+    
+    ' --- SGP ---
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "DinSGP", Array(3, 4, 5), 200, _
+                              "Evolução das categorias das avaliações da SGP", "0,0%", "media", 3, 2)
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "DinSGP", Array(6), 200, _
+                              "Evolução do NPS da SGP", "0,0%", "nps", 4, 2)
+    
+    ' --- CBEN ---
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "DinCBEN", Array(3, 4, 5), 200, _
+                              "Evolução das categorias das avaliações da CBEN", "0,0%", "media", 6, 2)
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "DinCBEN", Array(6), 200, _
+                              "Evolução do NPS da CBEN", "0,0%", "nps", 7, 2)
+    
+    ' --- Chefia Imediata ---
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "DinCI", Array(3, 4, 5), 200, _
+                              "Evolução das categorias das avaliações da chefia imediata", "0,0%", "media", 9, 2)
+    Call CriarGraficoDinamico(setor, wsAvaTemp, "DinCI", Array(6), 200, _
+                              "Evolução do NPS da chefia imediata", "0,0%", "nps", 10, 2)
+    
+    Debug.Print "Fim: GerarGraficos"
+    Exit Sub
+    
+TratarErro:
+    MsgBox "Erro em GerarGraficos: " & Err.Description, vbCritical
+    Debug.Print "Erro em GerarGraficos [" & Err.Number & "]: " & Err.Description
+End Sub
+
+' --- Copia todos os gráficos da Collection para o Word ---
+Public Sub CopiarGraficosParaWord(wdDoc As Object, listaGraficos As Collection)
+    On Error GoTo TratarErro
+    
+    Dim ch As ChartObject
+    Dim wdRng As Object
+    Dim i As Long
+    
+    ' Posiciona no final do documento
+    Set wdRng = wdDoc.Content
+    wdRng.Collapse 0
+    
+    Debug.Print "Início: CopiarGraficosParaWord | Quantidade: " & listaGraficos.Count
+    
+    ' Percorre todos os gráficos da Collection
+    For i = 1 To listaGraficos.Count
+        Set ch = listaGraficos(i)
+        
+        ' Copia gráfico do Excel
+        ch.Chart.Copy
+        
+        ' Cola no Word como gráfico incorporado (não vinculado)
+        wdRng.PasteSpecial DataType:=0  ' 0 = wdPasteOLEObject
+        wdRng.InsertParagraphAfter
+        wdRng.Collapse 0
+        
+        ' Remove gráfico da planilha temporária
+        ch.Delete
+        
+        Debug.Print "Gráfico colado no Word: " & i
+    Next i
+    
+    Debug.Print "Fim: CopiarGraficosParaWord"
+    Exit Sub
+    
+TratarErro:
+    MsgBox "Erro em CopiarGraficosParaWord: " & Err.Description, vbCritical
+    Debug.Print "Erro em CopiarGraficosParaWord [" & Err.Number & "]: " & Err.Description
+End Sub
+
+' --- Inicializa Word e retorna o objeto da aplicação ---
+Public Function AbrirWord() As Object
+    On Error GoTo TratarErro
+    Set AbrirWord = GetObject(, "Word.Application")
+    If AbrirWord Is Nothing Then Set AbrirWord = CreateObject("Word.Application")
+    AbrirWord.Visible = True
+    Exit Function
+    
+TratarErro:
+    MsgBox "Erro ao inicializar Word: " & Err.Description, vbCritical
+    Debug.Print "Erro ao inicializar Word [" & Err.Number & "]: " & Err.Description
+    Set AbrirWord = Nothing
+End Function
+
+' --- Sub que cria gráfico e já copia para o Word ---
+Public Sub CriarECopiarGrafico(setor As String, ws As Worksheet, nomeTabela As String, _
+                               colunasY As Variant, altura As Double, titulo As String, _
+                               formato As String, tipo As String, posTop As Double, Optional maxLinhas As Long = 0, _
+                               Optional wdDoc As Object = Nothing)
+    Dim ch As ChartObject
+    
+    ' Cria gráfico dinâmico
+    Set ch = CriarGraficoDinamico(setor, ws, nomeTabela, colunasY, altura, titulo, formato, tipo, posTop, maxLinhas)
+    
+    ' Adiciona à Collection global
+    listaGraficos.Add ch
+    
+    ' Se Word estiver aberto, copia imediatamente
+    If Not wdDoc Is Nothing Then
+        ch.Chart.Copy
+        Dim wdRng As Object
+        Set wdRng = wdDoc.Content
+        wdRng.Collapse 0
+        wdRng.PasteSpecial DataType:=0 ' wdPasteOLEObject
+        wdRng.InsertParagraphAfter
+        wdRng.Collapse 0
+        ' Remove gráfico da planilha temporária
+        ch.Delete
+        Debug.Print "Gráfico '" & titulo & "' colado no Word"
+    End If
+End Sub
