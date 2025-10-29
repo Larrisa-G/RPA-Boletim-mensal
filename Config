@@ -1,0 +1,28 @@
+Option Explicit
+
+' Constantes
+Public Const FONTE As String = "Fonte: Fabricação própria SGP/CBEN"
+
+' Variáveis compartilhadas
+Public graficoList As Variant
+Public tituloList As Variant
+Public uorgAtual As String
+Public wdApp As Word.Application
+Public wdDoc As Word.Document
+Public ws As Worksheet
+
+Public Sub InicializarConfig()
+
+    Set ws = ThisWorkbook.Sheets("Gráficos")
+    
+    uorgAtual = ws.Range("D3").Value
+
+    graficoList = Array("Evolução de FBG e FBT", "Média móvel de FBG", "Média móvel de FBT", "Avaliação CI", "NPS CI")
+    tituloList = Array("Evolução de FBG e FBT", "Média móvel de FBG", "Média móvel de FBT", _
+                       "Evolução da Avaliação das ações da Chefia Imediata", "Evolução do NPS das ações da Chefia Imediata")
+    
+    'Aplicativos
+    Set wdApp = GetObject(, "Word.Application")
+    Set wdDoc = wdApp.Documents("Boletim Pulso - Parte 2")
+    
+End Sub
