@@ -1,0 +1,15 @@
+' Classe: InserirGraficosCommand
+Option Explicit
+
+
+Public Sub Execute()
+    Dim nomeGrafico As Variant
+    
+    For Each nomeGrafico In Config.graficoList
+        Config.ws.ChartObjects(nomeGrafico).Chart.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+            With Config.wdDoc.Content
+                .InsertAfter vbCrLf
+                .Paragraphs.Last.Range.Paste
+            End With
+        Next nomeGrafico
+End Sub
