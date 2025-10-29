@@ -4,7 +4,7 @@ Option Explicit
 
 Public Sub Execute()
     With Config.wdDoc.Content
-        .InsertAfter vbCrLf & Config.uorgAtual & vbCrLf
-        .Paragraphs.Last.Style = Config.wdDoc.Styles("Título 2")
+        .Paragraphs.Last.Style = Config.wdDoc.Styles("Título 3")
+        .InsertAfter Config.uorgAtual & vbCrLf
     End With
 End Sub
