@@ -1,0 +1,9 @@
+' Classe: InserirFonteCommand
+Option Explicit
+
+Public Sub Execute()
+    With Config.wdDoc.Content
+        .InsertAfter vbCrLf & Config.FONTE
+        .Paragraphs.Last.Style = Config.wdDoc.Styles("Fonte")
+    End With
+End Sub
