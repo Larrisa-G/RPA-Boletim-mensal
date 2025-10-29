@@ -1,0 +1,23 @@
+' Módulo - CommandInvoker: InserirConteudoNoWord
+Option Explicit
+
+Public Sub InserirConteudoNoWord()
+
+    'Inicializa variáveis e objetos compartilhados
+    Call Config.InicializarConfig
+    
+    ' Cria e executa os comandos
+    Dim tituloCmd As InserirTituloCommand
+    Dim graficosCmd As InserirGraficosCommand
+    Dim fonteCmd As InserirFonteCommand
+
+    Set tituloCmd = New InserirTituloCommand
+    Set graficosCmd = New InserirGraficosCommand
+    Set fonteCmd = New InserirFonteCommand
+
+    tituloCmd.Execute
+    graficosCmd.Execute
+    fonteCmd.Execute
+
+    MsgBox "Conteúdo da uorg inserido com sucesso!"
+End Sub
