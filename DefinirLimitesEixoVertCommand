@@ -25,15 +25,16 @@ Public Sub Execute(nomeGrafico As Variant)
         Next i
     Next serie
 
-    'Calcular x e limites
+    'Calcula x
     media = (valorMaximo + valorMinimo) / 2
     x = Application.WorksheetFunction.Max(valorMaximo - media, media - valorMinimo)
     
+    'Calcula limites
     limiteInferior = media - x
     limiteSuperior = media + x
     
-    limiteInferior = PadronizarCasaDecimal(limiteInferior)
-    limiteSuperior = PadronizarCasaDecimal(limiteSuperior)
+    limiteInferior = PadronizarCasaDecimal(limiteInferior, "min")
+    limiteSuperior = PadronizarCasaDecimal(limiteSuperior, "max")
 
     'Defini limites do eixo vertical
     grafico.Axes(xlValue).MinimumScale = limiteInferior
@@ -41,18 +42,22 @@ Public Sub Execute(nomeGrafico As Variant)
 End Sub
 
 'Ajusta o valor para casa decimal com 0 ou 5
-Private Function PadronizarCasaDecimal(valor As Double) As Double
+Private Function PadronizarCasaDecimal(limite As Double, tipoLim As String) As Double
     Dim parteInteira As Long
     Dim parteDecimal As Double
+    
+    parteInteira = Int(limite)
+    parteDecimal = limite - parteInteira
 
-    parteInteira = Int(valor)
-    parteDecimal = valor - parteInteira
-
-    If parteDecimal < 0.25 Then
-        PadronizarCasaDecimal = parteInteira
-    ElseIf parteDecimal < 0.75 Then
+    If parteDecimal < 0.49 Then
+            PadronizarCasaDecimal = parteInteira
+    ElseIf parteDecimal < 0.5 Then
         PadronizarCasaDecimal = parteInteira + 0.5
     Else
-        PadronizarCasaDecimal = parteInteira + 1
+        If tipoLim = "max" Then
+            PadronizarCasaDecimal = parteInteira + 1
+        ElseIf tipoLim = "min" Then
+            PadronizarCasaDecimal = parteInteira
+        End If
     End If
 End Function
