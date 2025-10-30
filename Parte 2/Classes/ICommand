@@ -1,0 +1,6 @@
+' Interface : ICommand
+Option Explicit
+
+Public Type ICommand
+    Execute As Object
+End Type

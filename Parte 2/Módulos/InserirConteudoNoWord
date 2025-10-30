@@ -1,0 +1,29 @@
+' Módulo - CommandInvoker: InserirConteudoNoWord
+Option Explicit
+
+
+Public Sub InserirConteudoNoWord()
+    
+    'Inicializa variáveis e objetos compartilhados
+    Call Config.InicializarConfig
+    
+    Dim i As Integer
+    Dim tituloCmd As InserirTituloCommand
+    Dim graficoComFonteCmd As InserirGraficoComFonteCommand
+    
+    'Insere o título da seção
+    Set tituloCmd = New InserirTituloCommand
+    tituloCmd.Execute
+    
+    'Insere os gráficos com as fontes
+    For i = LBound(Config.graficoList) To UBound(Config.graficoList)
+        Set graficoComFonteCmd = New InserirGraficoComFonteCommand
+        graficoComFonteCmd.Init Config.graficoList(i)
+        graficoComFonteCmd.Execute
+    Next i
+
+    Config.wdDoc.Content.InsertAfter vbCrLf
+    Config.wdDoc.Paragraphs.Last.Range.InsertBreak Type:=wdPageBreak
+
+    MsgBox "Conteúdo da uorg inserido com sucesso!"
+End Sub

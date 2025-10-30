@@ -1,0 +1,27 @@
+' Classe: InserirGraficoComFonteCommand
+Option Explicit
+
+Private nomeGrafico As String
+
+Public Sub Init(nome As Variant)
+    nomeGrafico = nome
+End Sub
+
+Public Sub Execute()
+
+    'Insere o gráfico
+    Config.ws.ChartObjects(nomeGrafico).Chart.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+    With Config.wdDoc.Content
+        .Paragraphs.Last.Style = Config.wdDoc.Styles("normal")
+        .InsertAfter vbCrLf
+        .Paragraphs.Last.Range.Paste
+        .Paragraphs.Last.Alignment = wdAlignParagraphCenter
+    End With
+    
+    'Insere a fonte
+    With Config.wdDoc.Content
+        .InsertAfter vbCrLf & Config.FONTE
+        .Paragraphs.Last.Style = Config.wdDoc.Styles("> Fonte")
+        .InsertAfter vbCrLf
+    End With
+End Sub
