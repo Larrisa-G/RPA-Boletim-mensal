@@ -49,10 +49,10 @@ Private Function PadronizarCasaDecimal(limite As Double, tipoLim As String) As D
     parteInteira = Int(limite)
     parteDecimal = limite - parteInteira
 
-    If parteDecimal < 0.49 Then
+    If parteDecimal < 0.49 And tipoLim = "min" Then
             PadronizarCasaDecimal = parteInteira
-    ElseIf parteDecimal < 0.5 Then
-        PadronizarCasaDecimal = parteInteira + 0.5
+    'ElseIf parteDecimal < 0.5 Then
+       ' PadronizarCasaDecimal = parteInteira + 0.5
     Else
         If tipoLim = "max" Then
             PadronizarCasaDecimal = parteInteira + 1
